@@ -1,3 +1,13 @@
+#
+# Author: Sean Yu <sean.yu@smithsdetect.com>
+# Maintainer: Sean Yu <sean.yu@smithsdetection.com>
+#
+# Internal Use Only – Authorized Smiths Detection employees and contractors only.
+#
+# This script is provided "as is" without warranty of any kind.
+# Not an officially supported product unless explicitly stated.
+#
+
 ## This script collects **CLEAR** bags from MUX and standalone CTXs and copies them to `bagdata_archive` folder in the USB flash drive where the script is invoked. See list below:
 
 AIRPORT	    LOCATION	PLATFORM	# of CLEAR images	Notes
