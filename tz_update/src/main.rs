@@ -301,6 +301,26 @@ fn rpm_filename_matches(name: &str, family: &str, java: bool) -> bool {
     name.starts_with(prefix) && name.ends_with(&suffix)
 }
 
+fn optional_java_rpm_path(dir: &Path, family: &str) -> Result<Option<PathBuf>, String> {
+    let suffix = format!(".{family}.noarch.rpm");
+    let has_matching_file = fs::read_dir(dir)
+        .map_err(|e| format!("read RPM directory {}: {e}", dir.display()))?
+        .filter_map(Result::ok)
+        .any(|entry| {
+            let path = entry.path();
+            path.is_file()
+                && path.file_name().and_then(|x| x.to_str())
+                    .map(|name| name.starts_with("tzdata-java-") && name.ends_with(&suffix))
+                    .unwrap_or(false)
+        });
+
+    if !has_matching_file {
+        return Ok(None);
+    }
+
+    rpm_path(dir, family, true).map(Some)
+}
+
 fn rpm_path(dir: &Path, family: &str, java: bool) -> Result<PathBuf, String> {
     let prefix = if java { "tzdata-java-" } else { "tzdata-" };
     let mut candidates: Vec<(String, PathBuf)> = Vec::new();
@@ -380,7 +400,14 @@ fn install_local_packages(config: &Config) -> Result<bool, String> {
     if config.mode == Mode::TimezoneOnly { log("Timezone-only mode: skipping RPM checks and installation."); return Ok(false); }
     let family = detect_local_os()?;
     let tzrpm = rpm_path(&config.script_dir, family, false)?;
-    let javarpm = if config.install_java { Some(rpm_path(&config.script_dir, family, true)?) } else { None };
+    let javarpm = if config.install_java {
+        optional_java_rpm_path(&config.script_dir, family)?
+    } else {
+        None
+    };
+    if config.install_java && javarpm.is_none() {
+        log(&format!("No {family} tzdata-java RPM bundled; skipping Java timezone package."));
+    }
     let expected = rpm_file_version(&tzrpm)?;
     if let Some(java_path) = &javarpm {
         let java_version = rpm_file_version(java_path)?;
@@ -390,9 +417,9 @@ fn install_local_packages(config: &Config) -> Result<bool, String> {
     }
     let mut packages: Vec<PathBuf> = Vec::new();
     let installed = rpm_version("tzdata");
-    let installed_java = if config.install_java { rpm_version("tzdata-java") } else { None };
+    let installed_java = if javarpm.is_some() { rpm_version("tzdata-java") } else { None };
     for (name, current) in [("tzdata", installed.as_deref()), ("tzdata-java", installed_java.as_deref())] {
-        if name == "tzdata" || config.install_java {
+        if name == "tzdata" || javarpm.is_some() {
             if let Some(current) = current {
                 if compare_rpm_versions(current, &expected)? == std::cmp::Ordering::Greater {
                     log(&format!("WARNING: installed {name} ({current}) is newer than bundled version ({expected}); skipping RPM changes to prevent downgrade."));
@@ -426,7 +453,7 @@ fn install_local_packages(config: &Config) -> Result<bool, String> {
         if !out.status.success() { return Err(format!("RPM installation failed: {}", String::from_utf8_lossy(&out.stderr))); }
         log("Timezone RPM installation completed.");
     } else { log("All requested timezone RPM packages are already current."); }
-    for (name, required) in [("tzdata", true), ("tzdata-java", config.install_java)] {
+    for (name, required) in [("tzdata", true), ("tzdata-java", javarpm.is_some())] {
         if required && rpm_version(name).as_deref() != Some(expected.as_str()) { return Err(format!("{name} verification failed; expected {expected}")); }
     }
     Ok(!packages.is_empty())
@@ -642,6 +669,8 @@ fn update_remote(config: &Config, zone: &str, host: &Host, ts: &str) -> Result<b
 
     let mut remote_dir = String::new();
     let mut expected = String::new();
+    // Whether a Java timezone RPM was actually selected and transferred.
+    let mut install_java_remote = false;
 
     let target = format!("{}@{}", config.ssh_user, host.ip);
 
@@ -677,8 +706,8 @@ fn update_remote(config: &Config, zone: &str, host: &Host, ts: &str) -> Result<b
         };
 
         let java = if config.install_java {
-            match rpm_path(&config.script_dir, family, true) {
-                Ok(p) => match rpm_file_version(&p) {
+            match optional_java_rpm_path(&config.script_dir, family) {
+                Ok(Some(p)) => match rpm_file_version(&p) {
                     Ok(v) if v == expected => Some(p),
                     Ok(v) => {
                         log(&format!(
@@ -692,6 +721,13 @@ fn update_remote(config: &Config, zone: &str, host: &Host, ts: &str) -> Result<b
                         return Err(1);
                     }
                 },
+                Ok(None) => {
+                    log(&format!(
+                        "[{}] No {family} tzdata-java RPM bundled; installing tzdata only.",
+                        host.name
+                    ));
+                    None
+                }
                 Err(e) => {
                     log(&format!("[{}] FAILED: {e}", host.name));
                     return Err(1);
@@ -700,6 +736,7 @@ fn update_remote(config: &Config, zone: &str, host: &Host, ts: &str) -> Result<b
         } else {
             None
         };
+        install_java_remote = java.is_some();
 
         remote_dir = format!(
             "/tmp/eds-tz-update-{ts}-{}",
@@ -788,7 +825,7 @@ fn update_remote(config: &Config, zone: &str, host: &Host, ts: &str) -> Result<b
 
 	let args = format!(
         "bash -s -- '{mode}' '{zone}' '{remote_dir}' '{is_server}' '{}' '{}'",
-        if config.install_java { "1" } else { "0" },
+        if install_java_remote { "1" } else { "0" },
         expected
     );
 
@@ -897,7 +934,7 @@ fn parse_args() -> Result<(Config, bool), String> {
             "--mode" => mode = match args.next().as_deref() { Some("packages") => Mode::Packages, Some("timezone") => Mode::TimezoneOnly, _ => return Err("--mode requires packages or timezone".into()) },
             "--ssh-user" => user = args.next().ok_or("--ssh-user requires a value")?,
             "--no-java" => install_java = false,
-            "--help" | "-h" => { println!("Usage: dst_tz_fix [--mode packages|timezone] [--ssh-user USER] [--no-java] [--self-test]\nThe interactive menu selects the operation; default is timezone-only. SSH_USER defaults to root; INSTALL_JAVA_TZDATA defaults to 1."); std::process::exit(0); },
+            "--help" | "-h" => { println!("Usage: dst_tz_fix [--mode packages|timezone] [--ssh-user USER] [--no-java] [--self-test]\nThe interactive menu selects the operation; default is timezone-only. In package mode, tzdata-java is installed only when a matching RPM is bundled for the target OS family. SSH_USER defaults to root; INSTALL_JAVA_TZDATA defaults to 1."); std::process::exit(0); },
             _ => return Err(format!("unknown argument: {arg}")),
         }
     }
@@ -915,6 +952,7 @@ fn main() {
 
     let local = local_ips();
     let (site, source, hosts) = inventory(&config, &local).unwrap_or_else(|e| fail(&e));
+    let zone = loop {
     let suggested_zone = choose_timezone(&site);
     let Some((selected_mode, zone)) = choose_operation_mode(&site, suggested_zone) else {
         log("Exiting without making changes.");
@@ -933,13 +971,18 @@ fn main() {
             log(&format!("{family} available tzdata: {base_version}"));
 
             if config.install_java {
-                let java_path = rpm_path(&config.script_dir, family, true)
-                    .unwrap_or_else(|e| fail(&e));
-                let java_version = rpm_file_version(&java_path)
-                    .unwrap_or_else(|e| fail(&format!("cannot query {}: {e}", java_path.display())));
-                log(&format!("{family} available tzdata-java: {java_version}"));
-                if base_version != java_version {
-                    fail(&format!("tzdata and tzdata-java RPM versions differ for {family}: {base_version} vs {java_version}"));
+                match optional_java_rpm_path(&config.script_dir, family)
+                    .unwrap_or_else(|e| fail(&e))
+                {
+                    Some(java_path) => {
+                        let java_version = rpm_file_version(&java_path)
+                            .unwrap_or_else(|e| fail(&format!("cannot query {}: {e}", java_path.display())));
+                        log(&format!("{family} available tzdata-java: {java_version}"));
+                        if base_version != java_version {
+                            fail(&format!("tzdata and tzdata-java RPM versions differ for {family}: {base_version} vs {java_version}"));
+                        }
+                    }
+                    None => log(&format!("{family}: no tzdata-java RPM bundled; Java package will be skipped for this OS family.")),
                 }
             }
         }
@@ -948,9 +991,16 @@ fn main() {
 
     println!("\n============================================================\nSite ID:       {site}\nTimezone:      {zone}\nInventory DB:  {source}\nSSH user:      {}\nMode:          {}\nJava tzdata:   {}\n============================================================",
         config.ssh_user, if config.mode == Mode::Packages { "packages" } else { "timezone-only" }, if config.install_java { "1" } else { "0" });
-    print!("Apply changes to this machine and inventory hosts? [Y/n]: "); let _ = io::stdout().flush();
-    let mut answer = String::new(); let _ = io::stdin().read_line(&mut answer);
-    if !answer.trim().is_empty() && !matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes") { log("Cancelled. No changes made."); return; }
+    print!("Apply changes to this machine and inventory hosts? [y/N]: "); let _ = io::stdout().flush();
+    let mut answer = String::new();
+    if io::stdin().read_line(&mut answer).is_err()
+        || !matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
+    {
+        log("Cancelled. Returning to the main menu; no changes made.");
+        continue;
+    }
+    break zone;
+};
 
     let ts = timestamp();
     let mut summary = Summary::default();
