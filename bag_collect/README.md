@@ -1,7 +1,7 @@
 # CLEAR Bag Collection Script
 
-**Author:** Sean Yu  
-**Company:** Smiths Detection LLC
+**Author:** Sean Yu\
+**Company:** Smiths Detection LLC\
 **Email:** sean.yu@smithsdetection.com  
 
 
