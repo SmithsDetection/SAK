@@ -1,7 +1,9 @@
 # CLEAR Bag Collection Script
 
-**Author:** Sean Yu <sean.yu@smithsdetect.com>  
-**Maintainer:** Sean Yu <sean.yu@smithsdetection.com>
+**Author:** Sean Yu  
+**Compay:** Smiths Detection LLC
+**Email:** sean.yu@smithsdetection.com  
+
 
 **Confidentiality:** Internal Use Only — Authorized Smiths Detection employees and contractors only.
 
@@ -80,9 +82,6 @@ Commands shown inside square brackets are to be entered as written, without the 
 
 ## 3. Support and Contact Information
 
-For questions, issues, or improvement suggestions regarding this script, please contact:
+For questions, issues, or improvement suggestions regarding this script, please contact author.
 
-**Sean Yu**  
-Smiths Detection  
-Email: sean.yu@smithsdetection.com  
-Phone: 778-231-8868
+
