@@ -1,44 +1,88 @@
-#
-# Author: Sean Yu <sean.yu@smithsdetect.com>
-# Maintainer: Sean Yu <sean.yu@smithsdetection.com>
-#
-# Internal Use Only – Authorized Smiths Detection employees and contractors only.
-#
-# This script is provided "as is" without warranty of any kind.
-# Not an officially supported product unless explicitly stated.
-#
+# CLEAR Bag Collection Script
 
-## This script collects **CLEAR** bags from MUX and standalone CTXs and copies them to `bagdata_archive` folder in the USB flash drive where the script is invoked. See list below:
+**Author:** Sean Yu <sean.yu@smithsdetect.com>  
+**Maintainer:** Sean Yu <sean.yu@smithsdetection.com>
 
-AIRPORT	    LOCATION	PLATFORM	# of CLEAR images	Notes
-YYZ 	    DOM & INTL 	9800 		1000			    DOM 600; INTL 400
-YVR	        TB O/S		5800		500			        X133 400; X235 100
-YUL	        TB		    9800		1000			    K177/K178
-YWG	        DOM/INT		9800		500			        K566/K567
+**Confidentiality:** Internal Use Only — Authorized Smiths Detection employees and contractors only.
 
+**Disclaimer:** This script is provided "as is" without warranty of any kind. It is not an officially supported product unless explicitly stated.
 
-## Usage
+## 1. Overview
 
-(command inside [] are to be entered as is)
+This script collects **CLEAR bags** from MUX and standalone CTXs and copies them to the `bagdata_archive` folder on the USB flash drive from which the script is invoked.
 
-1. Copy the script file to USB flash drive.  
-2. Plug USB flash drive into CTX, UI workstation or RAIN server.  
-3. Find out where USB drive is mounted [ lsblk ]
-3. Change to USB drive [ cd /run/media/geeds/USBName ]
-4. Run the script directly on USB flash drive and follow the onscreen prompt:  [./bag_collect]
-   (if script couldnt' finish when using default 5-day range, try narrow down data range to one day. Most likely a single day will provide sufficient bags to meet the collection quota).
-   (It's always a good idea to use slightly higher quota number as target. For example to collect 1000 bags, set quota to 1100. If script become stuck near the end say 1050 bags have been collected, simple press Ctrl-C to exit)
-      
-6. After bag collection is complete, review log file inside 'bagdata_archive' folder
-7. Rename bagdata_archive to your airport code: [  mv bagdata_archive YYZ ]
-8. Umount USB flash drive: [  umount /run/media/geeds/USBName ]
-9. Contact Supervisor on how to send the USB drive to CATSA
+The collection targets are listed below.
 
+| Airport | Location | Platform | Number of CLEAR Images | Notes |
+|---|---|---|---:|---|
+| YYZ | DOM & INTL | 9800 | 1,000 | DOM: 600; INTL: 400 |
+| YVR | TB O/S | 5800 | 500 | X133: 400; X235: 100 |
+| YUL | TB | 9800 | 1,000 | K177/K178 |
+| YWG | DOM/INT | 9800 | 500 | K566/K567 |
 
-# For questions, issues, or improvement suggestions regarding this script,
-please contact:
+## 2. Usage Instructions
 
-Sean Yu
-Smiths Detection
-sean.yu@smithsdetection.com
-778-231-8868
+Commands shown inside square brackets are to be entered as written, without the brackets.
+
+1. **Copy the script to a USB flash drive.**
+
+2. **Insert the USB flash drive** into a CTX, UI workstation, or RAIN server.
+
+3. **Identify the USB mount location.**
+
+   ```bash
+   lsblk
+   ```
+
+4. **Change to the USB flash drive directory.**
+
+   Replace `USBName` with the actual USB directory name.
+
+   ```bash
+   cd /run/media/geeds/USBName
+   ```
+
+5. **Run the script and follow the on-screen prompts.**
+
+   ```bash
+   ./bag_collect
+   ```
+
+   **Collection recommendations:**
+
+   - If the script cannot finish using the default five-day date range, try narrowing the data range to one day. A single day will often provide sufficient bags to meet the collection quota.
+   - Set the target quota slightly higher than the required number. For example, to collect 1,000 bags, set the quota to 1,100.
+   - If the script becomes stuck near the end of collection—for example, after collecting approximately 1,050 bags—press `Ctrl+C` to exit.
+
+6. **Review the collection log.**
+
+   After collection is complete, review the log file inside the `bagdata_archive` folder.
+
+7. **Rename the archive folder to your airport code.**
+
+   For example, for Toronto Pearson (YYZ):
+
+   ```bash
+   mv bagdata_archive YYZ
+   ```
+
+8. **Unmount the USB flash drive.**
+
+   Replace `USBName` with the actual USB mount directory.
+
+   ```bash
+   umount /run/media/geeds/USBName
+   ```
+
+9. **Arrange delivery of the USB flash drive.**
+
+   Contact your supervisor for instructions on sending the USB drive to CATSA.
+
+## 3. Support and Contact Information
+
+For questions, issues, or improvement suggestions regarding this script, please contact:
+
+**Sean Yu**  
+Smiths Detection  
+Email: sean.yu@smithsdetection.com  
+Phone: 778-231-8868
