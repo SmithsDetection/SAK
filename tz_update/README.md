@@ -34,7 +34,7 @@ Before starting, confirm:
     binary (if updating the timezone database):
 
     -   For Postman 1: `tzdata-2026e-1.fc20.noarch.rpm`\
-        `tzdata-java-2026e-1.fc20.noarch.rpm`
+                       `tzdata-java-2026e-1.fc20.noarch.rpm`
     -   For Postman 4: `tzdata-2026e-1.el7.noarch.rpm`\
         Optional: `tzdata-java-2026e-1.el7.noarch.rpm`
 
